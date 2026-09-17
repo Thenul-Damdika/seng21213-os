@@ -44,13 +44,18 @@ endif
 BOOT_SRC  := boot/boot.asm
 BOOT_BIN  := boot/boot.bin
 
-KERNEL_ASM_SRC := kernel/kernel_entry.asm
-KERNEL_ASM_OBJ := build/kernel_entry.o
+KERNEL_ASM_SRC := kernel/kernel_entry.asm\
+                  kernel/interrupt_stubs.asm
+KERNEL_ASM_OBJ := build/kernel_entry.o\
+                  build/interrupt_stubs.o
 
 KERNEL_C_SRCS  := kernel/kernel.c \
                    kernel/vga.c    \
-                   kernel/keyboard.c
-
+                   kernel/keyboard.c \
+                  kernel/process.c \
+                  kernel/scheduler.c\
+                  kernel/interrupts.c \
+                  kernel/timer.c
 # Add your new source files below as the course progresses:
 # Lecture 09: kernel/process.c kernel/scheduler.c
 # Lecture 10: kernel/thread.c  kernel/mutex.c
@@ -84,7 +89,12 @@ $(BOOT_BIN): $(BOOT_SRC)
 # ---------------------------------------------------------------------------
 # Kernel: Assembly object
 # ---------------------------------------------------------------------------
-$(KERNEL_ASM_OBJ): $(KERNEL_ASM_SRC)
+build/kernel_entry.o: kernel/kernel_entry.asm
+	@mkdir -p build
+	@echo "  [AS]  $<"
+	$(AS) $(ASFLAGS) $< -o $@
+
+build/interrupt_stubs.o: kernel/interrupt_stubs.asm
 	@mkdir -p build
 	@echo "  [AS]  $<"
 	$(AS) $(ASFLAGS) $< -o $@
