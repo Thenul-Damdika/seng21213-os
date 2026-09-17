@@ -595,11 +595,6 @@ void test_process1(void)
 {
     while (1)
     {
-        vga_puts("1");
-
-        for (volatile unsigned int i = 0; i < 500000; i++)
-        {
-        }
     }
 }
 
@@ -607,11 +602,6 @@ void test_process2(void)
 {
     while (1)
     {
-        vga_puts("2");
-
-        for (volatile unsigned int i = 0; i < 500000; i++)
-        {
-        }
     }
 }
 
@@ -619,11 +609,6 @@ void test_process3(void)
 {
     while (1)
     {
-        vga_puts("3");
-
-        for (volatile unsigned int i = 0; i < 500000; i++)
-        {
-        }
     }
 }
 
