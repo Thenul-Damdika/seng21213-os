@@ -3,7 +3,7 @@
  * SENG21213-OS :: Main Kernel
  * File   : kernel/kernel.c
  *
- * Stage 1 – Process Management
+ * Stage 1 - Process Management
  *   - PCB / process table
  *   - Process creation
  *   - Ready queue
@@ -110,7 +110,7 @@ static void print_splash(void)
 
     vga_set_cursor(3, 2);
     vga_puts_color(
-        "  Faculty of Engineering – Department of Software Engineering",
+        "  Faculty of Engineering - Department of Software Engineering",
         VGA_LIGHT_GREY,
         VGA_BLACK
     );
@@ -136,7 +136,7 @@ static void print_splash(void)
         "  Welcome! This kernel was compiled from source and booted entirely\n"
     );
     vga_puts(
-        "  from bare metal. There is no Linux or Windows underneath – only\n"
+        "  from bare metal. There is no Linux or Windows underneath - only\n"
     );
     vga_puts(
         "  the code you and your team write.\n"
@@ -146,22 +146,22 @@ static void print_splash(void)
 
     vga_puts_color("    [L09] ", VGA_YELLOW, VGA_BLACK);
     vga_puts(
-        "Process Management  – PCB, ready queue, round-robin scheduler\n"
+        "Process Management  - PCB, ready queue, round-robin scheduler\n"
     );
 
     vga_puts_color("    [L10] ", VGA_YELLOW, VGA_BLACK);
     vga_puts(
-        "Threads & Sync      – kernel threads, mutex, semaphore\n"
+        "Threads & Sync      - kernel threads, mutex, semaphore\n"
     );
 
     vga_puts_color("    [L11] ", VGA_YELLOW, VGA_BLACK);
     vga_puts(
-        "Memory Management   – physical page allocator, virtual memory\n"
+        "Memory Management   - physical page allocator, virtual memory\n"
     );
 
     vga_puts_color("    [L12] ", VGA_YELLOW, VGA_BLACK);
     vga_puts(
-        "File System         – RAM disk, FAT-like directory structure\n"
+        "File System         - RAM disk, FAT-like directory structure\n"
     );
 
     vga_puts("\n");
@@ -365,24 +365,24 @@ static void cmd_help(void)
     );
 
     vga_puts(
-        "  ─────────────────────────────────────────────\n"
+        "  ---------------------------------------------\n"
     );
 
-    vga_puts("  help     – Show this help message\n");
-    vga_puts("  clear    – Clear the screen\n");
-    vga_puts("  about    – About this OS and course\n");
-    vga_puts("  echo     – Echo text to screen\n");
-    vga_puts("  mem      – Memory map (stub)\n");
+    vga_puts("  help     - Show this help message\n");
+    vga_puts("  clear    - Clear the screen\n");
+    vga_puts("  about    - About this OS and course\n");
+    vga_puts("  echo     - Echo text to screen\n");
+    vga_puts("  mem      - Memory map (stub)\n");
 
     vga_puts_color(
-        "\n  Stage 1 – Process Management:\n",
+        "\n  Stage 1 - Process Management:\n",
         VGA_LIGHT_CYAN,
         VGA_BLACK
     );
 
-    vga_puts("  ps       – List processes\n");
-    vga_puts("  kill PID – Terminate a process\n");
-    vga_puts("  ticks    – Show timer ticks\n");
+    vga_puts("  ps       - List processes\n");
+    vga_puts("  kill PID - Terminate a process\n");
+    vga_puts("  ticks    - Show timer ticks\n");
 
     vga_puts_color(
         "\n  Future milestones:\n",
@@ -390,10 +390,10 @@ static void cmd_help(void)
         VGA_BLACK
     );
 
-    vga_puts("  threads  – [L10] List kernel threads\n");
-    vga_puts("  free     – [L11] Show free memory\n");
-    vga_puts("  ls       – [L12] List files\n");
-    vga_puts("  cat      – [L12] Print file contents\n\n");
+    vga_puts("  threads  - [L10] List kernel threads\n");
+    vga_puts("  free     - [L11] Show free memory\n");
+    vga_puts("  ls       - [L12] List files\n");
+    vga_puts("  cat      - [L12] Print file contents\n\n");
 }
 
 static void cmd_clear(void)
@@ -410,7 +410,7 @@ static void cmd_about(void)
     );
 
     vga_puts(
-        "  ─────────────────────────────────────────────\n"
+        "  ---------------------------------------------\n"
     );
 
     vga_puts(
@@ -430,7 +430,7 @@ static void cmd_about(void)
     );
 
     vga_puts(
-        "  Course       : SENG 21213 – Sem 2\n"
+        "  Course       : SENG 21213 - Sem 2\n"
     );
 
     vga_puts(
