@@ -34,7 +34,7 @@ static void cmd_clear(void);
 static void cmd_about(void);
 static void cmd_echo(const char *args);
 static void cmd_mem(void);
-
+static void cmd_threads(void);
 /* ---------------------------------------------------------------------------
  * Utility: minimal string helpers
  * --------------------------------------------------------------------------*/
@@ -471,6 +471,66 @@ static void cmd_mem(void)
     );
 }
 
+
+static void cmd_threads(void)
+{
+    vga_puts_color(
+        "\n  Kernel Threads\n",
+        VGA_LIGHT_CYAN,
+        VGA_BLACK
+    );
+
+    vga_puts(
+        "  ---------------------------------------------\n"
+    );
+
+    vga_puts("  TID     State\n");
+    vga_puts("  ---------------------------------------------\n");
+
+    int found = 0;
+
+    for (int tid = 1; tid <= 32; tid++)
+    {
+        tcb_t *thread = thread_get(tid);
+
+        if (thread != 0)
+        {
+            vga_printf("  %d       ", thread->tid);
+
+            if (thread->state == THREAD_READY)
+            {
+                vga_puts("READY\n");
+            }
+            else if (thread->state == THREAD_RUNNING)
+            {
+                vga_puts("RUNNING\n");
+            }
+            else if (thread->state == THREAD_BLOCKED)
+            {
+                vga_puts("BLOCKED\n");
+            }
+            else if (thread->state == THREAD_TERMINATED)
+            {
+                vga_puts("TERMINATED\n");
+            }
+            else
+            {
+                vga_puts("UNKNOWN\n");
+            }
+
+            found = 1;
+        }
+    }
+
+    if (found == 0)
+    {
+        vga_puts("  No threads found.\n");
+    }
+
+    vga_puts("\n");
+}
+
+
 /* ---------------------------------------------------------------------------
  * Shell
  * --------------------------------------------------------------------------*/
@@ -553,8 +613,15 @@ static void shell_run(void)
             continue;
         }
 
+	/* Thread command */
+	if (k_strcmp(cmd, "threads") == 0)
+	{
+    	cmd_threads();
+    	continue;
+	}
+
         /* Future milestone stubs */
-        if (k_strcmp(cmd, "threads") == 0 ||
+        if (
             k_strcmp(cmd, "ls") == 0 ||
             k_strcmp(cmd, "cat") == 0)
         {
