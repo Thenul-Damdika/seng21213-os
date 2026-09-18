@@ -25,6 +25,9 @@
 #include "thread.h"
 #include "sync.h"
 #include "pmm.h"
+#include "fs.h"
+#include "ramdisk.h"
+
 
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
@@ -530,6 +533,316 @@ static void cmd_threads(void)
     vga_puts("\n");
 }
 
+static void cmd_ls(void);
+static void cmd_touch(const char *args);
+static void cmd_cat(const char *args);
+static void cmd_write(const char *args);
+static void cmd_rm(const char *args);
+
+/* ---------------------------------------------------------------------------
+ * Stage 4 - Filesystem commands
+ * --------------------------------------------------------------------------*/
+
+static void cmd_ls(void)
+{
+    char names[32][FS_FILENAME_LEN];
+
+    int count = fs_list(
+        names,
+        32
+    );
+
+    vga_puts_color(
+        "\n  Files\n",
+        VGA_LIGHT_CYAN,
+        VGA_BLACK
+    );
+
+    vga_puts(
+        "  ---------------------------------------------\n"
+    );
+
+    if (count <= 0)
+    {
+        vga_puts("  No files found.\n\n");
+        return;
+    }
+
+    for (int i = 0; i < count; i++)
+    {
+        vga_puts("  ");
+        vga_puts(names[i]);
+        vga_puts("\n");
+    }
+
+    vga_puts("\n");
+}
+
+
+static void cmd_touch(const char *args)
+{
+    const char *name = k_ltrim(args);
+
+    if (k_strlen(name) == 0)
+    {
+        vga_puts_color(
+            "\n  Usage: touch <filename>\n\n",
+            VGA_YELLOW,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    if (fs_create(name) == 0)
+    {
+        vga_puts_color(
+            "\n  File created successfully.\n\n",
+            VGA_LIGHT_GREEN,
+            VGA_BLACK
+        );
+    }
+    else
+    {
+        vga_puts_color(
+            "\n  Failed to create file.\n\n",
+            VGA_LIGHT_RED,
+            VGA_BLACK
+        );
+    }
+}
+
+
+static void cmd_cat(const char *args)
+{
+    const char *name = k_ltrim(args);
+
+    if (k_strlen(name) == 0)
+    {
+        vga_puts_color(
+            "\n  Usage: cat <filename>\n\n",
+            VGA_YELLOW,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    int fd = fs_open(
+        name,
+        FS_MODE_READ
+    );
+
+    if (fd < 0)
+    {
+        vga_puts_color(
+            "\n  File not found.\n\n",
+            VGA_LIGHT_RED,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    char buffer[128];
+
+    int bytes_read;
+
+    vga_puts("\n");
+
+    while (1)
+    {
+        bytes_read = fs_read(
+            fd,
+            buffer,
+            sizeof(buffer) - 1
+        );
+
+        if (bytes_read <= 0)
+        {
+            break;
+        }
+
+        buffer[bytes_read] = '\0';
+
+        vga_puts(buffer);
+    }
+
+    vga_puts("\n");
+
+    fs_close(fd);
+}
+
+
+static void cmd_write(const char *args)
+{
+    char filename[FS_FILENAME_LEN];
+    char text[256];
+
+    uint32_t i = 0;
+    uint32_t j = 0;
+
+    const char *input = k_ltrim(args);
+
+    if (k_strlen(input) == 0)
+    {
+        vga_puts_color(
+            "\n  Usage: write <filename> <text>\n\n",
+            VGA_YELLOW,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    /*
+     * Read filename.
+     */
+    while (
+        input[i] != '\0' &&
+        input[i] != ' ' &&
+        j < FS_FILENAME_LEN - 1
+    )
+    {
+        filename[j] = input[i];
+
+        i++;
+        j++;
+    }
+
+    filename[j] = '\0';
+
+    /*
+     * Skip spaces before text.
+     */
+    while (input[i] == ' ')
+    {
+        i++;
+    }
+
+    if (filename[0] == '\0' ||
+        input[i] == '\0')
+    {
+        vga_puts_color(
+            "\n  Usage: write <filename> <text>\n\n",
+            VGA_YELLOW,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    /*
+     * Copy text.
+     */
+    j = 0;
+
+    while (
+        input[i] != '\0' &&
+        j < sizeof(text) - 1
+    )
+    {
+        text[j] = input[i];
+
+        i++;
+        j++;
+    }
+
+    text[j] = '\0';
+
+    /*
+     * Open file for writing.
+     */
+    int fd = fs_open(
+        filename,
+        FS_MODE_WRITE
+    );
+
+    /*
+     * If file doesn't exist, create it.
+     */
+    if (fd < 0)
+    {
+        if (fs_create(filename) != 0)
+        {
+            vga_puts_color(
+                "\n  Failed to create file.\n\n",
+                VGA_LIGHT_RED,
+                VGA_BLACK
+            );
+            return;
+        }
+
+        fd = fs_open(
+            filename,
+            FS_MODE_WRITE
+        );
+    }
+
+    if (fd < 0)
+    {
+        vga_puts_color(
+            "\n  Failed to open file.\n\n",
+            VGA_LIGHT_RED,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    int written = fs_write(
+        fd,
+        text,
+        j
+    );
+
+    fs_close(fd);
+
+    if (written < 0)
+    {
+        vga_puts_color(
+            "\n  Write failed.\n\n",
+            VGA_LIGHT_RED,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    vga_puts_color(
+        "\n  File written successfully.\n\n",
+        VGA_LIGHT_GREEN,
+        VGA_BLACK
+    );
+}
+
+
+static void cmd_rm(const char *args)
+{
+    const char *name = k_ltrim(args);
+
+    if (k_strlen(name) == 0)
+    {
+        vga_puts_color(
+            "\n  Usage: rm <filename>\n\n",
+            VGA_YELLOW,
+            VGA_BLACK
+        );
+        return;
+    }
+
+    if (fs_unlink(name) == 0)
+    {
+        vga_puts_color(
+            "\n  File deleted successfully.\n\n",
+            VGA_LIGHT_GREEN,
+            VGA_BLACK
+        );
+    }
+    else
+    {
+        vga_puts_color(
+            "\n  Failed to delete file.\n\n",
+            VGA_LIGHT_RED,
+            VGA_BLACK
+        );
+    }
+}
+
+
 
 /* ---------------------------------------------------------------------------
  * Shell
@@ -610,6 +923,38 @@ static void shell_run(void)
         if (k_strcmp(cmd, "ticks") == 0)
         {
             cmd_ticks();
+            continue;
+        }
+
+                /* Stage 4 - Filesystem commands */
+
+        if (k_strcmp(cmd, "ls") == 0)
+        {
+            cmd_ls();
+            continue;
+        }
+
+        if (k_strncmp(cmd, "touch ", 6) == 0)
+        {
+            cmd_touch(k_ltrim(cmd + 6));
+            continue;
+        }
+
+        if (k_strncmp(cmd, "cat ", 4) == 0)
+        {
+            cmd_cat(k_ltrim(cmd + 4));
+            continue;
+        }
+
+        if (k_strncmp(cmd, "write ", 6) == 0)
+        {
+            cmd_write(k_ltrim(cmd + 6));
+            continue;
+        }
+
+        if (k_strncmp(cmd, "rm ", 3) == 0)
+        {
+            cmd_rm(k_ltrim(cmd + 3));
             continue;
         }
 
@@ -832,6 +1177,10 @@ void kernel_main(void)
     thread_init();
     scheduler_init();
     pmm_init();
+
+
+	/* Stage 4 filesystem */
+     fs_init();
 
     mutex_init(&my_mutex);
 
