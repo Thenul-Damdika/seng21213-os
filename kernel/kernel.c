@@ -22,6 +22,9 @@
 #include "scheduler.h"
 #include "interrupts.h"
 #include "timer.h"
+#include "thread.h"
+#include "sync.h"
+
 
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
@@ -612,20 +615,168 @@ void test_process3(void)
     }
 }
 
+void test_thread(void *arg)
+{
+    (void)arg;
+
+    while (1)
+    {
+        vga_puts("T");
+
+        for (volatile int i = 0; i < 1000000; i++)
+        {
+        }
+    }
+}
+
+
+
 /* ---------------------------------------------------------------------------
  * Kernel entry point
  * --------------------------------------------------------------------------*/
+
+volatile int myglobal = 0;
+volatile int race_done = 0;
+mutex_t my_mutex;
+
+#define BUFFER_SIZE 5
+
+int buffer[BUFFER_SIZE];
+int buffer_in = 0;
+int buffer_out = 0;
+
+semaphore_t empty;
+semaphore_t full;
+mutex_t buffer_mutex;
+
+
+void race_thread(void *arg)
+{
+    (void)arg;
+
+    for (int i = 0; i < 1000; i++)
+    {
+        int temp = myglobal;
+
+        for (volatile int j = 0; j < 10000; j++)
+        {
+        }
+
+        myglobal = temp + 1;
+    }
+
+    race_done++;
+
+    thread_exit();
+
+    while (1)
+    {
+        __asm__ __volatile__("hlt");
+    }
+}
+
+
+    
+
+
+
+void mutex_thread(void *arg)
+{
+    (void)arg;
+
+    for (int i = 0; i < 1000; i++)
+    {
+        mutex_lock(&my_mutex);
+
+        int temp = myglobal;
+
+        for (volatile int j = 0; j < 10000; j++)
+        {
+        }
+
+        myglobal = temp + 1;
+
+        mutex_unlock(&my_mutex);
+    }
+
+    thread_exit();
+
+    while (1)
+    {
+        __asm__ __volatile__("hlt");
+    }
+}
+
+
+void producer(void *arg)
+{
+    (void)arg;
+
+    for (int i = 1; i <= 10; i++)
+    {
+        sem_wait(&empty);
+
+        mutex_lock(&buffer_mutex);
+
+        buffer[buffer_in] = i;
+        buffer_in = (buffer_in + 1) % BUFFER_SIZE;
+
+        mutex_unlock(&buffer_mutex);
+
+        sem_signal(&full);
+    }
+
+    thread_exit();
+
+    while (1)
+    {
+        __asm__ __volatile__("hlt");
+    }
+}
+
+void consumer(void *arg)
+{
+    (void)arg;
+
+    for (int i = 0; i < 10; i++)
+    {
+        sem_wait(&full);
+
+        mutex_lock(&buffer_mutex);
+
+        int value = buffer[buffer_out];
+        buffer_out = (buffer_out + 1) % BUFFER_SIZE;
+
+        mutex_unlock(&buffer_mutex);
+
+        sem_signal(&empty);
+        (void)value;
+    }
+
+    thread_exit();
+
+    while (1)
+    {
+        __asm__ __volatile__("hlt");
+    }
+}
+
+
 void kernel_main(void)
 {
     vga_init();
     kb_init();
 
     process_init();
+    thread_init();
     scheduler_init();
 
-    process_create(test_process1);
-    process_create(test_process2);
-    process_create(test_process3);
+    mutex_init(&my_mutex);
+
+    sem_init(&empty, BUFFER_SIZE);
+    sem_init(&full, 0);
+
+    mutex_init(&buffer_mutex);
 
     interrupts_init();
     timer_init();
@@ -633,9 +784,46 @@ void kernel_main(void)
     __asm__ __volatile__("sti");
 
     print_splash();
+
+    vga_puts_color(
+        "\n=== STAGE 2 SYNCHRONIZATION TEST ===\n",
+        VGA_YELLOW,
+        VGA_BLACK
+    );
+
+    vga_puts("Creating kernel threads...\n");
+
+    myglobal = 0;
+    race_done = 0;
+
+    thread_create(race_thread, 0);
+    thread_create(race_thread, 0);
+
+    vga_puts("Race condition test started.\n");
+
+    /* Mutex test */
+    myglobal = 0;
+
+    thread_create(mutex_thread, 0);
+    thread_create(mutex_thread, 0);
+
+    vga_puts("Mutex test started.\n");
+
+    /* Producer-consumer test */
+    buffer_in = 0;
+    buffer_out = 0;
+
+    sem_init(&empty, BUFFER_SIZE);
+    sem_init(&full, 0);
+    mutex_init(&buffer_mutex);
+
+    thread_create(producer, 0);
+    thread_create(consumer, 0);
+
+    vga_puts("Producer-consumer test started.\n");
+    vga_puts("Stage 2 threads created successfully.\n\n");
+
     shell_run();
 
-    /* Should never reach here */
     __asm__ __volatile__("hlt");
 }
-

@@ -2,12 +2,14 @@
 #define SCHEDULER_H
 
 #include "process.h"
+#include "thread.h"
 
-#define READY_QUEUE_SIZE MAX_PROCESSES
+#define READY_QUEUE_SIZE (MAX_PROCESSES + MAX_THREADS)
 
 void scheduler_init(void);
 
 int scheduler_enqueue(int pid);
+int scheduler_enqueue_thread(int tid);
 
 int scheduler_dequeue(void);
 

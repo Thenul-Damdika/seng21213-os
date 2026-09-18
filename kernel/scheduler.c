@@ -1,23 +1,36 @@
 #include "scheduler.h"
 
+/*
+ * Positive values represent processes.
+ * Negative values represent threads.
+ *
+ * Example:
+ *   3  = process PID 3
+ *  -1  = thread TID 1
+ *  -2  = thread TID 2
+ */
 static int ready_queue[READY_QUEUE_SIZE];
 
 static int queue_head;
 static int queue_tail;
 static int queue_count;
 
-static int current_pid;
+/* Current running object */
+static int current_id;
+static int current_is_thread;
 
 void scheduler_init(void)
 {
     queue_head = 0;
     queue_tail = 0;
     queue_count = 0;
-    current_pid = -1;
+
+    current_id = -1;
+    current_is_thread = 0;
 
     for (int i = 0; i < READY_QUEUE_SIZE; i++)
     {
-        ready_queue[i] = -1;
+        ready_queue[i] = 0;
     }
 }
 
@@ -47,6 +60,30 @@ int scheduler_enqueue(int pid)
     return 0;
 }
 
+int scheduler_enqueue_thread(int tid)
+{
+    if (queue_count >= READY_QUEUE_SIZE)
+    {
+        return -1;
+    }
+
+    /*
+     * Store thread TID as negative value.
+     */
+    ready_queue[queue_tail] = -tid;
+
+    queue_tail++;
+
+    if (queue_tail >= READY_QUEUE_SIZE)
+    {
+        queue_tail = 0;
+    }
+
+    queue_count++;
+
+    return 0;
+}
+
 int scheduler_dequeue(void)
 {
     if (queue_count == 0)
@@ -54,9 +91,9 @@ int scheduler_dequeue(void)
         return -1;
     }
 
-    int pid = ready_queue[queue_head];
+    int id = ready_queue[queue_head];
 
-    ready_queue[queue_head] = -1;
+    ready_queue[queue_head] = 0;
 
     queue_head++;
 
@@ -67,33 +104,67 @@ int scheduler_dequeue(void)
 
     queue_count--;
 
-    return pid;
+    return id;
 }
 
 int scheduler_next(void)
 {
-    int pid;
-
     while (!scheduler_is_empty())
     {
-        pid = scheduler_dequeue();
+        int id = scheduler_dequeue();
 
-        process_t *process =
-            process_get((uint32_t)pid);
-
-        if (process == 0)
+        /*
+         * Process
+         */
+        if (id > 0)
         {
-            continue;
+            process_t *process =
+                process_get((uint32_t)id);
+
+            if (process == 0)
+            {
+                continue;
+            }
+
+            if (process->state != PROCESS_READY)
+            {
+                continue;
+            }
+
+            process->state = PROCESS_RUNNING;
+
+            current_id = id;
+            current_is_thread = 0;
+
+            return id;
         }
 
-        if (process->state != PROCESS_READY)
+        /*
+         * Thread
+         */
+        if (id < 0)
         {
-            continue;
+            int tid = -id;
+
+            tcb_t *thread = thread_get(tid);
+
+            if (thread == 0)
+            {
+                continue;
+            }
+
+            if (thread->state != THREAD_READY)
+            {
+                continue;
+            }
+
+            thread->state = THREAD_RUNNING;
+
+            current_id = tid;
+            current_is_thread = 1;
+
+            return id;
         }
-
-        process->state = PROCESS_RUNNING;
-
-        return pid;
     }
 
     return -1;
@@ -102,77 +173,118 @@ int scheduler_next(void)
 void scheduler_tick(void)
 {
     /*
-     * Put the current running process back into
+     * Put current running object back into
      * the READY queue.
-     *
-     * Do not requeue a terminated process.
      */
-    if (current_pid != -1)
+    if (current_id != -1)
     {
-        process_t *current =
-            process_get((uint32_t)current_pid);
-
-        if (current != 0)
+        if (current_is_thread)
         {
-            if (current->state == PROCESS_RUNNING)
+            tcb_t *thread =
+                thread_get(current_id);
+
+            if (thread != 0 &&
+                thread->state == THREAD_RUNNING)
             {
-                current->state = PROCESS_READY;
-                scheduler_enqueue(current_pid);
+                thread->state = THREAD_READY;
+                scheduler_enqueue_thread(current_id);
+            }
+        }
+        else
+        {
+            process_t *process =
+                process_get((uint32_t)current_id);
+
+            if (process != 0 &&
+                process->state == PROCESS_RUNNING)
+            {
+                process->state = PROCESS_READY;
+                scheduler_enqueue(current_id);
             }
         }
     }
 
-    /*
-     * Select the next READY process.
-     */
-    current_pid = scheduler_next();
+    scheduler_next();
 }
 
 uint32_t scheduler_switch(uint32_t current_esp)
 {
     /*
-     * Save the current process stack pointer.
+     * Save current stack pointer.
      */
-    if (current_pid != -1)
+    if (current_id != -1)
     {
-        process_t *current =
-            process_get((uint32_t)current_pid);
-
-        if (current != 0)
+        if (current_is_thread)
         {
-            current->stack_pointer = current_esp;
+            tcb_t *thread =
+                thread_get(current_id);
 
-            /*
-             * If the current process is still running,
-             * return it to the READY queue.
-             */
-            if (current->state == PROCESS_RUNNING)
+            if (thread != 0)
             {
-                current->state = PROCESS_READY;
-                scheduler_enqueue(current_pid);
+                thread->esp = current_esp;
+
+                if (thread->state == THREAD_RUNNING)
+                {
+                    thread->state = THREAD_READY;
+                    scheduler_enqueue_thread(current_id);
+                }
+            }
+        }
+        else
+        {
+            process_t *process =
+                process_get((uint32_t)current_id);
+
+            if (process != 0)
+            {
+                process->stack_pointer = current_esp;
+
+                if (process->state == PROCESS_RUNNING)
+                {
+                    process->state = PROCESS_READY;
+                    scheduler_enqueue(current_id);
+                }
             }
         }
     }
 
     /*
-     * Select the next READY process.
+     * Select next object.
      */
-    int next_pid_selected = scheduler_next();
+    int next = scheduler_next();
 
-    if (next_pid_selected == -1)
+    if (next == -1)
     {
         return current_esp;
     }
 
-    current_pid = next_pid_selected;
+    /*
+     * Next process.
+     */
+    if (next > 0)
+    {
+        process_t *process =
+            process_get((uint32_t)next);
 
-    process_t *next =
-        process_get((uint32_t)current_pid);
+        if (process == 0)
+        {
+            return current_esp;
+        }
 
-    if (next == 0)
+        return process->stack_pointer;
+    }
+
+    /*
+     * Next thread.
+     */
+    int tid = -next;
+
+    tcb_t *thread = thread_get(tid);
+
+    if (thread == 0)
     {
         return current_esp;
     }
 
-    return next->stack_pointer;
+    return thread->esp;
 }
