@@ -24,7 +24,7 @@
 #include "timer.h"
 #include "thread.h"
 #include "sync.h"
-
+#include "pmm.h"
 
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
@@ -444,36 +444,30 @@ static void cmd_echo(const char *args)
 
 static void cmd_mem(void)
 {
+    uint32_t total = pmm_get_total_frames();
+    uint32_t used = pmm_get_used_frames();
+    uint32_t free = pmm_get_free_frames();
+
     vga_puts_color(
-        "\n  Memory Map (stub – implement PMM in Lecture 11)\n",
+        "\n  Physical Memory Manager\n",
         VGA_LIGHT_CYAN,
         VGA_BLACK
     );
 
     vga_puts(
-        "  ─────────────────────────────────────────────\n"
+        "  ---------------------------------------------\n"
+    );
+
+    vga_printf("  Total Frames : %u\n", total);
+    vga_printf("  Used Frames  : %u\n", used);
+    vga_printf("  Free Frames  : %u\n", free);
+
+    vga_puts(
+        "  Page Size    : 4096 bytes\n"
     );
 
     vga_puts(
-        "  0x00000000 – 0x000FFFFF  :  First 1 MB (reserved/BIOS)\n"
-    );
-
-    vga_puts(
-        "  0x00100000 – 0x00EFFFFF  :  Extended memory (usable ~14 MB)\n"
-    );
-
-    vga_puts(
-        "  0x00F00000 – 0x00FFFFFF  :  BIOS / ROM area\n"
-    );
-
-    vga_puts(
-        "  0xB8000    – 0xBFFFF     :  VGA frame buffer\n"
-    );
-
-    vga_puts_color(
-        "\n  TODO: Use BIOS int 0x15, EAX=0xE820 to get real memory map\n\n",
-        VGA_YELLOW,
-        VGA_BLACK
+        "  Total Memory : 32 MB\n\n"
     );
 }
 
@@ -527,7 +521,8 @@ static void shell_run(void)
             continue;
         }
 
-        if (k_strcmp(cmd, "mem") == 0)
+         if (k_strcmp(cmd, "mem") == 0 ||
+             k_strcmp(cmd, "free") == 0)
         {
             cmd_mem();
             continue;
@@ -560,7 +555,6 @@ static void shell_run(void)
 
         /* Future milestone stubs */
         if (k_strcmp(cmd, "threads") == 0 ||
-            k_strcmp(cmd, "free") == 0 ||
             k_strcmp(cmd, "ls") == 0 ||
             k_strcmp(cmd, "cat") == 0)
         {
@@ -770,6 +764,7 @@ void kernel_main(void)
     process_init();
     thread_init();
     scheduler_init();
+    pmm_init();
 
     mutex_init(&my_mutex);
 
@@ -781,7 +776,7 @@ void kernel_main(void)
     interrupts_init();
     timer_init();
 
-    __asm__ __volatile__("sti");
+    __asm__ __volatile__("sti");  
 
     print_splash();
 

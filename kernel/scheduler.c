@@ -209,6 +209,13 @@ void scheduler_tick(void)
 
 uint32_t scheduler_switch(uint32_t current_esp)
 {
+
+    if (current_id == -1)
+    {
+        return current_esp;
+    }
+
+
     /*
      * Save current stack pointer.
      */
